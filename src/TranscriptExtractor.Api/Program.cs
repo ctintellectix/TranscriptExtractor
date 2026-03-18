@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using TranscriptExtractor.Api.Contracts;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Entities;
+using TranscriptExtractor.Core.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
     options.UseInMemoryDatabase("TranscriptExtractor"));
+builder.Services.AddSingleton<ITranscriptPdfRenderer, StubTranscriptPdfRenderer>();
 
 var app = builder.Build();
 
@@ -80,6 +82,36 @@ app.MapGet("/transcripts/{id:guid}/extraction", async (Guid id, TranscriptExtrac
         promptVersion = document.PromptVersion,
         json = document.Json
     });
+});
+
+app.MapGet("/reports/transcripts/{id:guid}/pdf", async (
+    Guid id,
+    TranscriptExtractorDbContext db,
+    ITranscriptPdfRenderer pdfRenderer) =>
+{
+    var transcript = await db.Transcripts.FindAsync(id);
+    if (transcript is null)
+    {
+        return Results.NotFound();
+    }
+
+    var document = await db.ExtractionDocuments
+        .OrderByDescending(x => x.CreatedAt)
+        .FirstOrDefaultAsync(x => x.TranscriptId == id);
+
+    if (document is null)
+    {
+        return Results.Conflict(new { message = "Extraction not ready." });
+    }
+
+    var report = TranscriptReportComposer.Compose(document.Json);
+    var templateVersion = string.IsNullOrWhiteSpace(document.ReportTemplateVersion)
+        ? ReportTemplateVersion.Current
+        : document.ReportTemplateVersion;
+    var html = TranscriptReportHtmlRenderer.Render(report, templateVersion);
+    var pdf = pdfRenderer.RenderPdf(html, templateVersion);
+
+    return Results.File(pdf, "application/pdf", $"transcript-{id}.pdf");
 });
 
 app.MapGet("/", () => "Hello World!");
