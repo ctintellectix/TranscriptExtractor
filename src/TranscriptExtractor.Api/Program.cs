@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
     options.UseInMemoryDatabase("TranscriptExtractor"));
-builder.Services.AddSingleton<ITranscriptPdfRenderer, StubTranscriptPdfRenderer>();
+builder.Services.AddSingleton<ITranscriptPdfRenderer, QuestTranscriptPdfRenderer>();
 
 var app = builder.Build();
 

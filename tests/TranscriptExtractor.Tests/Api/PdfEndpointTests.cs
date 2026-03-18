@@ -86,5 +86,8 @@ public class PdfEndpointTests : IClassFixture<TranscriptApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.True(bytes.Length > 4);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
     }
 }
