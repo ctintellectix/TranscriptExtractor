@@ -79,13 +79,28 @@ public static class TranscriptReportComposer
 
         if (root.TryGetProperty("locations", out var locations) && locations.ValueKind == JsonValueKind.Array)
         {
+            var markerNumber = 1;
             foreach (var item in locations.EnumerateArray())
             {
+                var address = GetString(item, "address") ?? string.Empty;
+                var isVerifiedAddress = LooksLikeStreetAddress(address);
+
                 report.Locations.Add(new TranscriptLocationViewModel
                 {
                     Name = GetString(item, "name") ?? string.Empty,
-                    Address = GetString(item, "address") ?? string.Empty
+                    Address = address,
+                    IsVerifiedAddress = isVerifiedAddress
                 });
+
+                if (isVerifiedAddress)
+                {
+                    report.VerifiedMapLocations.Add(new TranscriptMapLocationViewModel
+                    {
+                        MarkerNumber = markerNumber++,
+                        Name = GetString(item, "name") ?? string.Empty,
+                        Address = address
+                    });
+                }
             }
         }
 
@@ -152,5 +167,17 @@ public static class TranscriptReportComposer
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
+    }
+
+    private static bool LooksLikeStreetAddress(string? address)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return false;
+        }
+
+        return address.Any(char.IsDigit) &&
+               address.Any(char.IsLetter) &&
+               address.Contains(' ', StringComparison.Ordinal);
     }
 }

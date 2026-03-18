@@ -52,7 +52,45 @@ public class TranscriptReportComposerTests
         Assert.Single(report.Objects);
         Assert.Single(report.Relationships);
         Assert.Single(report.Locations);
+        Assert.Single(report.VerifiedMapLocations);
         Assert.Equal("Emily Carter", report.Statements[0].SpeakerName);
         Assert.Equal("Michael Turner's Residence", report.Timeline[0].LocationName);
+        Assert.True(report.Locations[0].IsVerifiedAddress);
+        Assert.Equal("1427 Walnut Street", report.VerifiedMapLocations[0].Address);
+    }
+
+    [Fact]
+    public void Compose_OnlyMarksStreetStyleAddressesAsVerifiedMapLocations()
+    {
+        const string json = """
+        {
+          "transcript_metadata": {
+            "source_type": "witness_interview"
+          },
+          "people": [],
+          "locations": [
+            { "location_id": "l1", "name": "Silver Lantern Bar", "address": null, "type": "business", "assertion_type": "explicit", "confidence": 0.98 },
+            { "location_id": "l2", "name": "Parking Lot", "address": "Parking lot behind the bar", "type": "other", "assertion_type": "explicit", "confidence": 0.81 },
+            { "location_id": "l3", "name": "Marcus Residence", "address": "1427 Walnut Street, Las Vegas, NV", "type": "residence", "assertion_type": "explicit", "confidence": 0.93 }
+          ],
+          "objects": [],
+          "statements": [],
+          "described_events": [],
+          "relationship_claims": [],
+          "allegations": [],
+          "emotional_behavioral_cues": [],
+          "contradictions": []
+        }
+        """;
+
+        var report = TranscriptReportComposer.Compose(json);
+
+        Assert.Equal(3, report.Locations.Count);
+        Assert.Single(report.VerifiedMapLocations);
+        Assert.Equal("Marcus Residence", report.VerifiedMapLocations[0].Name);
+        Assert.Equal("1427 Walnut Street, Las Vegas, NV", report.VerifiedMapLocations[0].Address);
+        Assert.False(report.Locations[0].IsVerifiedAddress);
+        Assert.False(report.Locations[1].IsVerifiedAddress);
+        Assert.True(report.Locations[2].IsVerifiedAddress);
     }
 }

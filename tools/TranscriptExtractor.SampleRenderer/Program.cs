@@ -1,3 +1,4 @@
+using TranscriptExtractor.Core.Maps;
 using TranscriptExtractor.Core.Reports;
 
 if (args.Length < 2)
@@ -18,7 +19,11 @@ if (!File.Exists(inputPath))
 var json = await File.ReadAllTextAsync(inputPath);
 var report = TranscriptReportComposer.Compose(json);
 var html = TranscriptReportHtmlRenderer.Render(report, ReportTemplateVersion.Current);
-var renderer = new QuestTranscriptPdfRenderer();
+using var geocoderClient = new HttpClient();
+using var staticMapClient = new HttpClient();
+var renderer = new QuestTranscriptPdfRenderer(
+    new OpenStreetMapAddressGeocoder(geocoderClient),
+    new OpenStreetMapStaticMapRenderer(staticMapClient));
 var pdfBytes = renderer.RenderPdf(html, ReportTemplateVersion.Current);
 
 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);

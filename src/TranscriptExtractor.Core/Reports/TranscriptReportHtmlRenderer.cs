@@ -23,7 +23,8 @@ public static class TranscriptReportHtmlRenderer
               .eyebrow { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#b24c20; font-weight:700; }
               .hero-title { font-family: Georgia, serif; font-size:34px; line-height:1.08; color:#2b2018; margin-top:10px; }
               .hero-meta { margin-top:14px; color:#684a36; font-size:13px; }
-              .content-grid { padding:22px 28px 28px; display:grid; grid-template-columns:1.45fr .95fr; gap:18px; }
+              .content-grid { padding:22px 28px 18px; display:grid; grid-template-columns:1.45fr .95fr; gap:18px; }
+              .full-width-row { padding:0 28px 28px; }
               .content-column { display:grid; gap:18px; }
               .report-section { background:#fcf7ee; border:1px solid #e8dece; border-radius:16px; padding:18px; }
               .section-number { font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:#8f7358; }
@@ -33,11 +34,13 @@ public static class TranscriptReportHtmlRenderer
               .relationship-constellation { position:relative; min-height:220px; overflow:hidden; }
               .relationship-node { position:absolute; padding:10px 14px; border-radius:999px; background:#efe3d0; color:#5e4939; }
               .relationship-edge { position:absolute; padding:8px 12px; border-radius:999px; background:#f7eee0; border:1px solid #dfc6ab; color:#b24c20; font-size:13px; }
-              .location-map-panel { display:grid; grid-template-columns:1.15fr .95fr; gap:18px; align-items:start; }
-              .map-canvas { height:300px; border-radius:14px; position:relative; overflow:hidden; background:radial-gradient(circle at 30% 34%, rgba(255,255,255,.55), transparent 16%), linear-gradient(180deg,#efe4d2 0%,#eadbc4 100%); border:1px solid #e3d4be; }
+              .location-map-panel { display:block; }
+              .map-canvas { height:420px; border-radius:14px; position:relative; overflow:hidden; background:radial-gradient(circle at 30% 34%, rgba(255,255,255,.55), transparent 16%), linear-gradient(180deg,#efe4d2 0%,#eadbc4 100%); border:1px solid #e3d4be; }
               .map-road { position:absolute; background:#d6c1a5; border-radius:999px; opacity:.8; }
               .map-marker { position:absolute; width:16px; height:16px; border-radius:50%; border:3px solid #fff7eb; box-shadow:0 0 0 1px rgba(70,45,22,.18); }
               .map-label { position:absolute; background:#fff8ec; border:1px solid #ead7bd; border-radius:12px; padding:8px 10px; color:#5b4738; font-size:12px; box-shadow:0 8px 18px rgba(66,44,23,.08); }
+              .map-unavailable { height:100%; display:flex; align-items:center; justify-content:center; text-align:center; color:#6f5a48; font-size:15px; padding:18px; }
+              .location-data-store { display:none; }
               ul.clean-list { list-style:none; padding:0; margin:0; }
             </style>
             """);
@@ -61,8 +64,10 @@ public static class TranscriptReportHtmlRenderer
         AppendSection(html, "04", "Key Objects", "objects",
             report.Objects.Select(x => $"<div class='object-card'><strong>{H(x.Name)}</strong><div>{H(x.Type)}</div></div>"));
         AppendRelationshipConstellation(html, report);
-        AppendLocationMapPanel(html, report);
         html.AppendLine("</div>");
+        html.AppendLine("</div>");
+        html.AppendLine("<div class='full-width-row'>");
+        AppendLocationMapPanel(html, report);
         html.AppendLine("</div>");
         html.AppendLine("</div></div>");
         html.AppendLine("</body></html>");
@@ -107,63 +112,78 @@ public static class TranscriptReportHtmlRenderer
     private static void AppendLocationMapPanel(StringBuilder html, TranscriptReportViewModel report)
     {
         html.AppendLine("<section class='report-section location-map-panel' data-section='locations'>");
-        html.AppendLine("<div style='grid-column:1 / -1;'>");
+        html.AppendLine("<div>");
         html.AppendLine("<div class='section-number'>Section 06</div>");
         html.AppendLine("<h2 class='section-title'>Key Locations</h2>");
         html.AppendLine("</div>");
 
         html.AppendLine("<div class='map-canvas'>");
-        html.AppendLine("<div class='map-road' style='left:24px;top:74px;width:420px;height:10px;transform:rotate(2deg);'></div>");
-        html.AppendLine("<div class='map-road' style='left:64px;top:222px;width:360px;height:10px;transform:rotate(-8deg);'></div>");
-        html.AppendLine("<div class='map-road' style='left:246px;top:22px;width:10px;height:240px;'></div>");
-
-        for (var i = 0; i < report.Locations.Count; i++)
+        if (report.VerifiedMapLocations.Count == 0)
         {
-            var location = report.Locations[i];
-            var markerColor = i switch
-            {
-                0 => "#bf602f",
-                1 => "#d58c49",
-                _ => "#7f9355"
-            };
-            var left = i switch
-            {
-                0 => "120px",
-                1 => "280px",
-                _ => "210px"
-            };
-            var top = i switch
-            {
-                0 => "120px",
-                1 => "84px",
-                _ => "230px"
-            };
-            var labelLeft = i switch
-            {
-                0 => "144px",
-                1 => "168px",
-                _ => "234px"
-            };
-            var labelTop = i switch
-            {
-                0 => "106px",
-                1 => "100px",
-                _ => "216px"
-            };
+            html.AppendLine("<div class='map-unavailable'>No verified map locations available.</div>");
+        }
+        else
+        {
+            html.AppendLine("<div class='map-road' style='left:24px;top:74px;width:420px;height:10px;transform:rotate(2deg);'></div>");
+            html.AppendLine("<div class='map-road' style='left:64px;top:222px;width:360px;height:10px;transform:rotate(-8deg);'></div>");
+            html.AppendLine("<div class='map-road' style='left:246px;top:22px;width:10px;height:240px;'></div>");
 
-            html.AppendLine($"<div class='map-marker' style='left:{left};top:{top};background:{markerColor};'></div>");
-            html.AppendLine($"<div class='map-label' style='left:{labelLeft};top:{labelTop};'><strong>{i + 1}. {WebUtility.HtmlEncode(location.Name)}</strong></div>");
+            foreach (var location in report.VerifiedMapLocations)
+            {
+                var index = location.MarkerNumber - 1;
+                var markerColor = index switch
+                {
+                    0 => "#bf602f",
+                    1 => "#d58c49",
+                    _ => "#7f9355"
+                };
+                var left = index switch
+                {
+                    0 => "120px",
+                    1 => "280px",
+                    _ => "210px"
+                };
+                var top = index switch
+                {
+                    0 => "120px",
+                    1 => "84px",
+                    _ => "230px"
+                };
+                var labelLeft = index switch
+                {
+                    0 => "146px",
+                    1 => "298px",
+                    _ => "228px"
+                };
+                var labelTop = index switch
+                {
+                    0 => "96px",
+                    1 => "58px",
+                    _ => "242px"
+                };
+
+                html.AppendLine($"<div class='map-marker' style='left:{left};top:{top};background:{markerColor};'></div>");
+                html.AppendLine($"<div class='map-label' style='left:{labelLeft};top:{labelTop};'>{WebUtility.HtmlEncode(location.Address)}</div>");
+            }
         }
 
         html.AppendLine("</div>");
-
-        html.AppendLine("<div>");
+        html.AppendLine("<div class='location-data-store'>");
         foreach (var location in report.Locations.Select((value, index) => new { value, index }))
         {
-            html.AppendLine("<div class='location-summary'>");
-            html.AppendLine($"<div class='section-number'>Marker {location.index + 1}</div>");
+            var markerLabel = "Text location";
+            if (location.value.IsVerifiedAddress)
+            {
+                var markerNumber = report.VerifiedMapLocations
+                    .FirstOrDefault(x => x.Name == location.value.Name && x.Address == location.value.Address)
+                    ?.MarkerNumber ?? (location.index + 1);
+                markerLabel = $"Marker {markerNumber}";
+            }
+
+            html.AppendLine($"<div class='location-summary' data-marker='{markerLabel}' data-name='{WebUtility.HtmlEncode(location.value.Name)}' data-address='{WebUtility.HtmlEncode(location.value.Address)}' data-verified='{location.value.IsVerifiedAddress.ToString().ToLowerInvariant()}'>");
+            html.AppendLine($"<div class='section-number'>{markerLabel}</div>");
             html.AppendLine($"<div class='section-title' style='font-size:22px;margin-top:6px;'>{WebUtility.HtmlEncode(location.value.Name)}</div>");
-            html.AppendLine($"<div>{WebUtility.HtmlEncode(location.value.Address)}</div>");
+            html.AppendLine($"<div class='location-address'>{WebUtility.HtmlEncode(location.value.Address)}</div>");
             html.AppendLine("</div>");
         }
 

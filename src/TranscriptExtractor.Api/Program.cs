@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TranscriptExtractor.Api.Contracts;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Entities;
+using TranscriptExtractor.Core.Maps;
 using TranscriptExtractor.Core.Persistence;
 using TranscriptExtractor.Core.Reports;
 
@@ -20,7 +21,9 @@ builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
         builder.Configuration.GetConnectionString("TranscriptExtractor")
             ?? throw new InvalidOperationException("Connection string 'TranscriptExtractor' is required."));
 });
-builder.Services.AddSingleton<ITranscriptPdfRenderer, QuestTranscriptPdfRenderer>();
+builder.Services.AddHttpClient<IAddressGeocoder, OpenStreetMapAddressGeocoder>();
+builder.Services.AddHttpClient<IStaticMapRenderer, OpenStreetMapStaticMapRenderer>();
+builder.Services.AddScoped<ITranscriptPdfRenderer, QuestTranscriptPdfRenderer>();
 
 var app = builder.Build();
 

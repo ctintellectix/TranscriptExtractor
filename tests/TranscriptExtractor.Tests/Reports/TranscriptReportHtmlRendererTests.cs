@@ -104,4 +104,26 @@ public class TranscriptReportHtmlRendererTests
         Assert.Contains("Section 05", html, StringComparison.Ordinal);
         Assert.Contains("Section 06", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Render_ShowsUnavailableStateWhenNoVerifiedMapLocationsExist()
+    {
+        var report = new TranscriptReportViewModel
+        {
+            SourceType = "witness_interview",
+            Locations =
+            {
+                new TranscriptLocationViewModel
+                {
+                    Name = "Parking Lot",
+                    Address = string.Empty,
+                    IsVerifiedAddress = false
+                }
+            }
+        };
+
+        var html = TranscriptReportHtmlRenderer.Render(report, ReportTemplateVersion.Current);
+
+        Assert.Contains("No verified map locations available.", html, StringComparison.Ordinal);
+    }
 }

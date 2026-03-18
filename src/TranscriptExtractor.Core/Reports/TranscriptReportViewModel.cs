@@ -9,6 +9,7 @@ public sealed class TranscriptReportViewModel
     public List<TranscriptObjectViewModel> Objects { get; set; } = new();
     public List<TranscriptRelationshipViewModel> Relationships { get; set; } = new();
     public List<TranscriptLocationViewModel> Locations { get; set; } = new();
+    public List<TranscriptMapLocationViewModel> VerifiedMapLocations { get; set; } = new();
 }
 
 public sealed class TranscriptTimelineItemViewModel
@@ -43,6 +44,14 @@ public sealed class TranscriptRelationshipViewModel
 
 public sealed class TranscriptLocationViewModel
 {
+    public string Name { get; set; } = string.Empty;
+    public string Address { get; set; } = string.Empty;
+    public bool IsVerifiedAddress { get; set; }
+}
+
+public sealed class TranscriptMapLocationViewModel
+{
+    public int MarkerNumber { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
 }

@@ -3,10 +3,13 @@ using System.Text.RegularExpressions;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using TranscriptExtractor.Core.Maps;
 
 namespace TranscriptExtractor.Core.Reports;
 
-public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
+public sealed class QuestTranscriptPdfRenderer(
+    IAddressGeocoder? geocoder = null,
+    IStaticMapRenderer? staticMapRenderer = null) : ITranscriptPdfRenderer
 {
     private static readonly Regex TagRegex = new("<.*?>", RegexOptions.Compiled);
     private static readonly Regex SectionRegex = new(
@@ -14,6 +17,9 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
     private static readonly Regex DivClassRegex = new(
         "<div[^>]*class='(?<class>[^']*)'[^>]*>(?<content>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
+    private static readonly Regex LocationSummaryRegex = new(
+        "<div[^>]*class='[^']*location-summary[^']*'[^>]*data-marker='(?<marker>[^']*)'[^>]*data-name='(?<name>[^']*)'[^>]*data-address='(?<address>[^']*)'[^>]*data-verified='(?<verified>[^']*)'[^>]*>",
         RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.IgnoreCase);
     private static readonly Regex ListItemRegex = new(
         "<li>(?<content>.*?)</li>",
@@ -30,6 +36,8 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
         var objectItems = ExtractItems(html, "objects");
         var relationshipItems = ExtractRelationshipItems(html);
         var locationItems = ExtractLocationItems(html);
+        var verifiedMapLocations = ExtractVerifiedMapLocations(locationItems);
+        var mapImage = BuildMapImage(verifiedMapLocations);
 
         return Document.Create(container =>
         {
@@ -40,6 +48,7 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
                 page.DefaultTextStyle(x => x.FontSize(10.5f).FontColor("#2b2018"));
 
                 page.Header()
+                    .ShowOnce()
                     .Column(column =>
                     {
                         column.Item().Background("#fbf4e8").Border(1).BorderColor("#dfcfb5").Padding(18).Column(header =>
@@ -54,27 +63,31 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
 
                 page.Content()
                     .PaddingVertical(12)
-                    .Row(row =>
+                    .Column(content =>
                     {
-                        row.RelativeItem(1.45f).Column(left =>
+                        content.Item().Row(row =>
                         {
-                            RenderCardSection(left, "Section 01", "Timeline of Events", timelineItems, "#c85e31");
-                            left.Item().PaddingTop(12);
-                            RenderCardSection(left, "Section 02", "Statements", statementItems, "#d18c46");
+                            row.RelativeItem(1.45f).Column(left =>
+                            {
+                                RenderCardSection(left, "Section 01", "Timeline of Events", timelineItems, "#c85e31");
+                                left.Item().PaddingTop(12);
+                                RenderCardSection(left, "Section 02", "Statements", statementItems, "#d18c46");
+                            });
+
+                            row.RelativeItem(.08f);
+
+                            row.RelativeItem(.95f).Column(right =>
+                            {
+                                RenderCardSection(right, "Section 03", "Allegations", allegationItems, "#b24c20");
+                                right.Item().PaddingTop(12);
+                                RenderCardSection(right, "Section 04", "Key Objects", objectItems, "#8f7358");
+                                right.Item().PaddingTop(12);
+                                RenderRelationshipConstellation(right, relationshipItems);
+                            });
                         });
 
-                        row.RelativeItem(.08f);
-
-                        row.RelativeItem(.95f).Column(right =>
-                        {
-                            RenderCardSection(right, "Section 03", "Allegations", allegationItems, "#b24c20");
-                            right.Item().PaddingTop(12);
-                            RenderCardSection(right, "Section 04", "Key Objects", objectItems, "#8f7358");
-                            right.Item().PaddingTop(12);
-                            RenderRelationshipConstellation(right, relationshipItems);
-                            right.Item().PaddingTop(12);
-                            RenderLocationPanel(right, locationItems);
-                        });
+                        content.Item().PaddingTop(14);
+                        RenderLocationPanel(content, locationItems, verifiedMapLocations, mapImage);
                     });
             });
         }).GeneratePdf();
@@ -129,44 +142,41 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
         });
     }
 
-    private static void RenderLocationPanel(ColumnDescriptor column, IReadOnlyList<string> locations)
+    private static void RenderLocationPanel(
+        ColumnDescriptor column,
+        IReadOnlyList<LocationRenderItem> locations,
+        IReadOnlyList<LocationRenderItem> verifiedMapLocations,
+        byte[]? mapImage)
     {
         column.Item().Background("#fcf7ee").Border(1).BorderColor("#e8dece").Padding(14).Column(section =>
         {
             section.Item().Text("Section 06").FontSize(9).FontColor("#8f7358");
             section.Item().Text("Key Locations").FontSize(18).Bold().FontFamily("Times New Roman");
 
-            section.Item().PaddingTop(10).Row(row =>
+            if (mapImage is not null)
             {
-                row.RelativeItem(1.1f).Background("#f8f1e4").Border(1).BorderColor("#e3d4be").MinHeight(180).Padding(12).Column(map =>
-                {
-                    map.Item().Text("Mini Map").FontSize(10).FontColor("#8f7358");
-                    foreach (var location in locations.Take(3).Select((value, index) => new { value, index }))
-                    {
-                        map.Item().PaddingTop(10).Text($"{location.index + 1}. {location.value}").FontSize(10);
-                    }
-                });
-
-                row.ConstantItem(10);
-
-                row.RelativeItem(.95f).Column(summary =>
-                {
-                    foreach (var location in locations.Take(3).Select((value, index) => new { value, index }))
-                    {
-                        summary.Item().Background("#fffdf9").Border(1).BorderColor("#eadfce").Padding(10).Column(card =>
-                        {
-                            card.Item().Text($"Marker {location.index + 1}").FontSize(8).FontColor("#8f7358");
-                            card.Item().Text(location.value).FontSize(13).Bold().FontFamily("Times New Roman");
-                        });
-                        summary.Item().PaddingTop(8);
-                    }
-
-                    if (locations.Count == 0)
-                    {
-                        summary.Item().Text("No locations extracted.").FontColor(Colors.Grey.Darken2);
-                    }
-                });
-            });
+                section.Item()
+                    .PaddingTop(10)
+                    .Background("#f8f1e4")
+                    .Border(1)
+                    .BorderColor("#e3d4be")
+                    .Padding(12)
+                    .Image(mapImage)
+                    .FitWidth();
+            }
+            else
+            {
+                section.Item()
+                    .PaddingTop(10)
+                    .Background("#f8f1e4")
+                    .Border(1)
+                    .BorderColor("#e3d4be")
+                    .MinHeight(260)
+                    .AlignMiddle()
+                    .AlignCenter()
+                    .Text("No verified map locations available.")
+                    .FontColor(Colors.Grey.Darken2);
+            }
         });
     }
 
@@ -217,18 +227,60 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
             : new List<string>();
     }
 
-    private static List<string> ExtractLocationItems(string html)
+    private static IReadOnlyList<LocationRenderItem> ExtractVerifiedMapLocations(IReadOnlyList<LocationRenderItem> locations)
+        => locations.Where(x => x.IsVerifiedAddress).ToList();
+
+    private byte[]? BuildMapImage(IReadOnlyList<LocationRenderItem> verifiedMapLocations)
+    {
+        if (verifiedMapLocations.Count == 0 || staticMapRenderer is null || geocoder is null)
+        {
+            return null;
+        }
+
+        var pins = new List<StaticMapPin>();
+        foreach (var location in verifiedMapLocations)
+        {
+            var geocoded = geocoder.GeocodeAsync(location.Address, CancellationToken.None).GetAwaiter().GetResult();
+            if (geocoded is null)
+            {
+                continue;
+            }
+
+            pins.Add(new StaticMapPin(location.MarkerNumber, location.Name, location.Address, geocoded.Latitude, geocoded.Longitude));
+        }
+
+        if (pins.Count == 0)
+        {
+            return null;
+        }
+
+        return staticMapRenderer.RenderAsync(
+                new StaticMapRequest
+                {
+                    Width = 640,
+                    Height = 360,
+                    Pins = pins
+                },
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    private static List<LocationRenderItem> ExtractLocationItems(string html)
     {
         var sectionContent = ExtractSectionContent(html, "locations");
         if (sectionContent is null)
         {
-            return new List<string>();
+            return new List<LocationRenderItem>();
         }
 
-        return DivClassRegex.Matches(sectionContent)
-            .Where(x => x.Groups["class"].Value.Contains("section-title", StringComparison.OrdinalIgnoreCase))
-            .Select(x => Clean(x.Groups["content"].Value))
-            .Where(x => !string.IsNullOrWhiteSpace(x) && !x.Equals("Key Locations", StringComparison.OrdinalIgnoreCase))
+        return LocationSummaryRegex.Matches(sectionContent)
+            .Select(x => new LocationRenderItem(
+                ParseMarkerNumber(WebUtility.HtmlDecode(x.Groups["marker"].Value)),
+                WebUtility.HtmlDecode(x.Groups["name"].Value),
+                WebUtility.HtmlDecode(x.Groups["address"].Value),
+                bool.TryParse(x.Groups["verified"].Value, out var isVerified) && isVerified))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Name))
             .ToList();
     }
 
@@ -244,4 +296,15 @@ public sealed class QuestTranscriptPdfRenderer : ITranscriptPdfRenderer
     {
         return WebUtility.HtmlDecode(TagRegex.Replace(htmlFragment, string.Empty)).Trim();
     }
+
+    private static int ParseMarkerNumber(string markerLabel)
+    {
+        var digits = new string(markerLabel.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : 0;
+    }
+    private sealed record LocationRenderItem(
+        int MarkerNumber,
+        string Name,
+        string Address,
+        bool IsVerifiedAddress);
 }
