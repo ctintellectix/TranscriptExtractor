@@ -6,7 +6,7 @@
 
 **Architecture:** Use a small .NET solution with `TranscriptExtractor.Api`, `TranscriptExtractor.Worker`, `TranscriptExtractor.Core`, and `TranscriptExtractor.Tests`. The API handles intake and retrieval, the worker performs prompt-driven extraction and persists the JSON result, and a report composition layer turns saved extraction JSON into HTML/PDF output on demand. Model access stays behind a pluggable extraction client interface so different model implementations can be swapped without changing the worker pipeline.
 
-**Tech Stack:** .NET 10, ASP.NET Core minimal APIs, EF Core with PostgreSQL, xUnit, FluentAssertions, and HTML-first PDF rendering.
+**Tech Stack:** .NET 10, ASP.NET Core minimal APIs, EF Core with PostgreSQL, xUnit, FluentAssertions, HTML-first PDF rendering, and free/OpenStreetMap-based geocoding plus static maps for verified addresses.
 
 ---
 
@@ -146,9 +146,9 @@ Run:
 - Create: `tests/TranscriptExtractor.Tests/Reports/TranscriptReportComposerTests.cs`
 - Create: `tests/TranscriptExtractor.Tests/Api/ExtractionEndpointsTests.cs`
 
-- [ ] **Step 1: Write failing tests for composing timeline, allegations, statement summaries, object cards, relationship items, and locations from JSON fixtures**
+- [ ] **Step 1: Write failing tests for composing timeline, allegations, statement summaries, object cards, relationship items, locations, and verified-address map eligibility from JSON fixtures**
 - [ ] **Step 2: Run targeted tests and verify RED**
-- [ ] **Step 3: Implement the minimal JSON-to-view-model composition layer and extraction retrieval endpoint**
+- [ ] **Step 3: Implement the minimal JSON-to-view-model composition layer, verified-address filtering rules, and extraction retrieval endpoint**
 - [ ] **Step 4: Run targeted tests, then full suite**
 - [ ] **Step 5: Commit**
 
@@ -163,11 +163,31 @@ Run:
 - Create: `tests/TranscriptExtractor.Tests/Reports/TranscriptReportHtmlRendererTests.cs`
 - Create: `tests/TranscriptExtractor.Tests/Api/PdfEndpointTests.cs`
 
-- [ ] **Step 1: Write failing tests for HTML section rendering, template version exposure, and PDF endpoint readiness behavior**
+- [ ] **Step 1: Write failing tests for HTML section rendering, verified-address unavailable state, template version exposure, and PDF endpoint readiness behavior**
 - [ ] **Step 2: Run targeted tests and verify RED**
 - [ ] **Step 3: Implement the minimal infographic HTML renderer and a temporary PDF renderer abstraction**
 - [ ] **Step 4: Run targeted tests, then full suite**
 - [ ] **Step 5: Commit**
+
+### Task 9: Add Verified Address Map Integration
+
+**Files:**
+- Modify: `src/TranscriptExtractor.Core/Reports/TranscriptReportViewModel.cs`
+- Modify: `src/TranscriptExtractor.Core/Reports/TranscriptReportComposer.cs`
+- Create: `src/TranscriptExtractor.Core/Maps/IAddressGeocoder.cs`
+- Create: `src/TranscriptExtractor.Core/Maps/IStaticMapRenderer.cs`
+- Create: `src/TranscriptExtractor.Core/Maps/OpenStreetMapAddressGeocoder.cs`
+- Create: `src/TranscriptExtractor.Core/Maps/StaticMapRequest.cs`
+- Modify: `src/TranscriptExtractor.Core/Reports/QuestTranscriptPdfRenderer.cs`
+- Modify: `src/TranscriptExtractor.Core/Reports/TranscriptReportHtmlRenderer.cs`
+- Create: `tests/TranscriptExtractor.Tests/Reports/VerifiedAddressMapTests.cs`
+
+- [ ] **Step 1: Write failing tests for verified-address filtering, geocoding guardrails, and combined map rendering state**
+- [ ] **Step 2: Run targeted tests and verify RED**
+- [ ] **Step 3: Implement free-provider geocoding and static-map integration for verified street addresses only**
+- [ ] **Step 4: Render one combined numbered map image plus matching legend in the PDF**
+- [ ] **Step 5: Run targeted tests, then full suite**
+- [ ] **Step 6: Commit**
 
 ### Task 8: Add Configuration and Developer Docs
 

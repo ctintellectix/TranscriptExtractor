@@ -252,6 +252,7 @@ Recommended PDF sections for v1:
 - key objects
 - relationships
 - key locations
+- verified address map
 - emotional/behavioral cues
 - contradictions
 
@@ -264,6 +265,7 @@ Recommended PDF sections for v1:
 - `objects` -> key objects cards/list
 - `relationship_claims` -> relationships section
 - `locations` -> key locations section
+- `locations.address` -> verified address map eligibility
 - `emotional_behavioral_cues` -> cues section
 - `contradictions` -> contradictions section
 - `people` -> names, roles, speaker labels, relationship endpoints, timeline participants
@@ -275,10 +277,29 @@ Because the JSON is atomic and graph-like, the PDF layer must compose it into pr
 - sort items into stable visual sections,
 - resolve human-readable labels from temporary IDs,
 - number timeline items and locations,
+- keep all extracted locations visible in text even when they are not mappable,
+- derive a separate verified-address subset for map rendering,
+- geocode only explicit street-style addresses,
+- request one combined static map image with numbered pins for verified addresses,
 - summarize dense graph data into readable blocks,
 - preserve evidence-oriented language and confidence context where useful.
 
 The PDF layer should not introduce new factual claims. It may reorganize, label, and format content, but must stay faithful to the saved JSON.
+
+### Verified Address Map
+
+The report should include a real map image only when the extraction contains concrete street-style addresses. Approximate place names such as business names, parking lots, or street names without a full address should remain in the textual `Key Locations` section but should not be geocoded or pinned.
+
+Recommended behavior:
+
+- show all extracted locations in the textual locations section,
+- create a separate `verified map locations` subset from locations with non-empty address fields that pass a basic address-likeness check,
+- geocode only that verified subset,
+- render one combined static map image with numbered pins,
+- render a matching numbered legend beside or below the map,
+- show a clear unavailable state such as `No verified map locations available` when no mappable addresses exist.
+
+For v1, prefer free/OpenStreetMap-based geocoding and static map providers rather than paid map APIs. The map is a presentation aid over trusted extracted addresses and should not guess coordinates for vague locations.
 
 ## Layout Strategy
 
