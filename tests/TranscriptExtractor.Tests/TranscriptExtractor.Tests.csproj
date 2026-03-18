@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TranscriptExtractor.Core\TranscriptExtractor.Core.csproj" />
     <ProjectReference Include="..\..\src\TranscriptExtractor.Api\TranscriptExtractor.Api.csproj" />
+    <ProjectReference Include="..\..\src\TranscriptExtractor.Worker\TranscriptExtractor.Worker.csproj" />
   </ItemGroup>
 
 </Project>

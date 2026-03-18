@@ -4,12 +4,14 @@ namespace TranscriptExtractor.Worker;
 
 public class Worker(
     ILogger<Worker> logger,
-    TranscriptExtractionOrchestrator orchestrator) : BackgroundService
+    IServiceScopeFactory scopeFactory) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            using var scope = scopeFactory.CreateScope();
+            var orchestrator = scope.ServiceProvider.GetRequiredService<TranscriptExtractionOrchestrator>();
             var processed = await orchestrator.ProcessOneAsync(stoppingToken);
 
             if (!processed && logger.IsEnabled(LogLevel.Information))

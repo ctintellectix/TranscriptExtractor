@@ -1,5 +1,6 @@
 using TranscriptExtractor.Worker;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Extraction;
 using TranscriptExtractor.Core.Persistence;
@@ -12,23 +13,40 @@ builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
         options,
         builder.Configuration.GetConnectionString("TranscriptExtractor")
             ?? throw new InvalidOperationException("Connection string 'TranscriptExtractor' is required.")));
-builder.Services.AddSingleton<IPromptAssetLoader>(_ =>
-    new FilePromptAssetLoader("lvpd-v1"));
-builder.Services.AddSingleton<ITranscriptExtractionClient, NotImplementedTranscriptExtractionClient>();
+builder.Services.Configure<PromptAssetOptions>(builder.Configuration.GetSection("PromptAssets"));
+builder.Services.Configure<OpenAiExtractionOptions>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.AddSingleton<IPromptAssetLoader>(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<PromptAssetOptions>>().Value;
+    return new FilePromptAssetLoader(options.Version);
+});
+builder.Services.AddHttpClient<ITranscriptExtractionClient, OpenAiTranscriptExtractionClient>((sp, httpClient) =>
+{
+    var options = sp.GetRequiredService<IOptions<OpenAiExtractionOptions>>().Value;
+
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+    {
+        httpClient.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    }
+});
 builder.Services.AddScoped(sp => new TranscriptExtractionOrchestrator(
     sp.GetRequiredService<TranscriptExtractorDbContext>(),
     sp.GetRequiredService<IPromptAssetLoader>(),
     sp.GetRequiredService<ITranscriptExtractionClient>(),
-    Path.Combine(AppContext.BaseDirectory, "prompts", "lvpd")));
+    ResolvePromptDirectory(
+        builder.Environment.ContentRootPath,
+        sp.GetRequiredService<IOptions<PromptAssetOptions>>().Value.Directory)));
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
 host.Run();
 
-internal sealed class NotImplementedTranscriptExtractionClient : ITranscriptExtractionClient
+static string ResolvePromptDirectory(string contentRootPath, string configuredDirectory)
 {
-    public Task<TranscriptExtractionResult> ExtractAsync(ExtractionRequest request, CancellationToken cancellationToken)
+    if (Path.IsPathRooted(configuredDirectory))
     {
-        throw new NotImplementedException("Transcript extraction client is not wired yet.");
+        return configuredDirectory;
     }
+
+    return Path.GetFullPath(Path.Combine(contentRootPath, "..", "..", configuredDirectory));
 }
