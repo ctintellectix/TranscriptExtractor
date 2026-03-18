@@ -70,4 +70,38 @@ public class TranscriptReportHtmlRendererTests
         Assert.Contains("Key Locations", html, StringComparison.Ordinal);
         Assert.Contains(ReportTemplateVersion.Current, html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Render_UsesEditorialInfographicMarkersForChosenSections()
+    {
+        var report = new TranscriptReportViewModel
+        {
+            SourceType = "witness_interview",
+            Relationships =
+            {
+                new TranscriptRelationshipViewModel
+                {
+                    SubjectName = "Emily Carter",
+                    RelationshipType = "neighbor",
+                    ObjectName = "Daniel Brooks"
+                }
+            },
+            Locations =
+            {
+                new TranscriptLocationViewModel
+                {
+                    Name = "Michael Turner's Residence",
+                    Address = "1427 Walnut Street"
+                }
+            }
+        };
+
+        var html = TranscriptReportHtmlRenderer.Render(report, ReportTemplateVersion.Current);
+
+        Assert.Contains("editorial-infographic", html, StringComparison.Ordinal);
+        Assert.Contains("relationship-constellation", html, StringComparison.Ordinal);
+        Assert.Contains("location-map-panel", html, StringComparison.Ordinal);
+        Assert.Contains("Section 05", html, StringComparison.Ordinal);
+        Assert.Contains("Section 06", html, StringComparison.Ordinal);
+    }
 }
