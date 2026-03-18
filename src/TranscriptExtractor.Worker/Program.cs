@@ -2,12 +2,16 @@ using TranscriptExtractor.Worker;
 using Microsoft.EntityFrameworkCore;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Extraction;
+using TranscriptExtractor.Core.Persistence;
 using TranscriptExtractor.Core.Prompts;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
-    options.UseInMemoryDatabase("TranscriptExtractor"));
+    TranscriptExtractorDbContextConfigurator.ConfigurePostgres(
+        options,
+        builder.Configuration.GetConnectionString("TranscriptExtractor")
+            ?? throw new InvalidOperationException("Connection string 'TranscriptExtractor' is required.")));
 builder.Services.AddSingleton<IPromptAssetLoader>(_ =>
     new FilePromptAssetLoader("lvpd-v1"));
 builder.Services.AddSingleton<ITranscriptExtractionClient, NotImplementedTranscriptExtractionClient>();

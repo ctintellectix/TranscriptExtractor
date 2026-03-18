@@ -2,12 +2,24 @@ using Microsoft.EntityFrameworkCore;
 using TranscriptExtractor.Api.Contracts;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Entities;
+using TranscriptExtractor.Core.Persistence;
 using TranscriptExtractor.Core.Reports;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
-    options.UseInMemoryDatabase("TranscriptExtractor"));
+{
+    if (builder.Environment.IsEnvironment("Testing"))
+    {
+        options.UseInMemoryDatabase("TranscriptExtractorTests");
+        return;
+    }
+
+    TranscriptExtractorDbContextConfigurator.ConfigurePostgres(
+        options,
+        builder.Configuration.GetConnectionString("TranscriptExtractor")
+            ?? throw new InvalidOperationException("Connection string 'TranscriptExtractor' is required."));
+});
 builder.Services.AddSingleton<ITranscriptPdfRenderer, QuestTranscriptPdfRenderer>();
 
 var app = builder.Build();

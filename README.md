@@ -2,7 +2,7 @@
 
 Transcript-local extraction pipeline for law-enforcement interview and transcript processing.
 
-The current solution accepts a transcript, creates a queued extraction job, stores a trusted JSON extraction document, and can render an infographic-style report through an HTML-backed PDF endpoint. The PDF renderer is currently a stub and will be replaced later with a real engine.
+The current solution accepts a transcript, creates a queued extraction job, stores a trusted JSON extraction document, and can render an infographic-style PDF endpoint from the saved extraction payload.
 
 ## Solution Layout
 
@@ -26,8 +26,8 @@ Both app projects currently expose the same top-level configuration sections:
 
 Current note:
 
-- The runtime wiring still uses EF Core InMemory for development scaffolding.
-- The connection string is documented now so we can switch to PostgreSQL cleanly when we replace the temporary provider setup.
+- The runtime wiring now uses the shared PostgreSQL configuration path.
+- The default local connection string assumes a PostgreSQL instance on `localhost:5432`.
 - `OpenAI:ApiKey` should be supplied from user secrets or environment variables, not committed settings.
 
 ## Prompt Assets
@@ -41,6 +41,18 @@ The extraction request is built from:
 The worker loads those files through the prompt asset loader and injects transcript text plus schema text into the final request payload.
 
 ## Local Run
+
+Start local PostgreSQL:
+
+```powershell
+docker compose up -d db
+```
+
+Apply the database migration:
+
+```powershell
+dotnet tool run dotnet-ef database update --project src\TranscriptExtractor.Core\TranscriptExtractor.Core.csproj
+```
 
 Build the solution:
 
@@ -70,6 +82,8 @@ dotnet run --project src\TranscriptExtractor.Worker\TranscriptExtractor.Worker.c
 
 Implemented so far:
 
+- PostgreSQL provider wiring
+- initial EF migration
 - transcript intake endpoint
 - transcript status endpoint
 - extraction retrieval endpoint
@@ -78,10 +92,9 @@ Implemented so far:
 - worker orchestration
 - report composition
 - HTML report rendering
-- stub PDF endpoint
+- real PDF endpoint
 
 Still planned:
 
-- durable database provider wiring
 - real extraction client implementation
-- real PDF rendering engine
+- deeper PDF polish and layout refinement

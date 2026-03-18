@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: transcript-extractor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transcript_extractor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - transcript-extractor-db-data:/var/lib/postgresql/data
+
+volumes:
+  transcript-extractor-db-data:
