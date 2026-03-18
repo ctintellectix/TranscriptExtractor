@@ -1,0 +1,12 @@
+Extract structured entities, events, statements, claims, and analysis from the following transcript.
+
+Transcript:
+<<<TRANSCRIPT_TEXT>>>
+
+Output JSON using this schema:
+<<<JSON OUTPUT SCHEMA>>>
+
+Rules:
+- Relationships may be between any entity types.
+- Statements represent speech.
+- Described events represent events talked about in statements.

@@ -1,0 +1,121 @@
+{
+  "transcript_metadata": {
+    "transcript_id": "string",
+    "datetime": "ISO8601 or null",
+    "location": "string or null",
+    "interviewer": "string or null",
+    "source_type": "suspect_interview | witness_interview | victim_statement | police_report"
+  },
+
+  "people": [
+    {
+      "person_id": "pX",
+      "name": "string",
+      "dob": "YYYY-MM-DD or null",
+      "roles": ["suspect | victim | witness | interviewer | family_member | employer | other"],
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "locations": [
+    {
+      "location_id": "lX",
+      "name": "string",
+      "address": "string or null",
+      "type": "residence | workplace | police_station | other",
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "objects": [
+    {
+      "object_id": "oX",
+      "name": "string",
+      "type": "phone | vehicle | document | weapon | other",
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "statements": [
+    {
+      "statement_id": "sX",
+      "speaker_id": "pX",
+      "verbatim_quote": "string or null",
+      "summary": "string",
+      "context": "string",
+      "confidence": 0.0
+    }
+  ],
+
+  "described_events": [
+    {
+      "event_id": "eX",
+      "event_type": "incident | allegation | presence | absence | employment | discipline | interview | other",
+      "description": "string",
+      "datetime": "ISO8601 or null",
+      "datetime_precision": "exact | approximate | unknown",
+      "participants": ["pX"],
+      "location_id": "lX or null",
+      "source_statement_id": "sX",
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "relationship_claims": [
+    {
+      "relationship_id": "rX",
+      "relationship_type": "string",
+      "subject": {
+        "entity_type": "person | object | location | event",
+        "entity_id": "pX | oX | lX | eX"
+      },
+      "object": {
+        "entity_type": "person | object | location | event",
+        "entity_id": "pX | oX | lX | eX"
+      },
+      "claim_context": "string",
+      "source_statement_id": "sX",
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "allegations": [
+    {
+      "allegation_id": "aX",
+      "alleged_perpetrator_id": "pX",
+      "victim_id": "pX",
+      "description": "string",
+      "datetime": "ISO8601 or null",
+      "location_id": "lX or null",
+      "reported_by": "pX",
+      "assertion_type": "explicit | inferred",
+      "confidence": 0.0
+    }
+  ],
+
+  "emotional_behavioral_cues": [
+    {
+      "cue_id": "cX",
+      "person_id": "pX",
+      "cue_type": "emotional | behavioral",
+      "description": "string",
+      "observed_during_statement_id": "sX",
+      "confidence": 0.0
+    }
+  ],
+
+  "contradictions": [
+    {
+      "contradiction_id": "xX",
+      "person_id": "pX",
+      "statement_ids": ["sX", "sY"],
+      "description": "string",
+      "confidence": 0.0
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TranscriptExtractor.Api/TranscriptExtractor.Api.csproj" />
+    <Project Path="src/TranscriptExtractor.Core/TranscriptExtractor.Core.csproj" />
+    <Project Path="src/TranscriptExtractor.Worker/TranscriptExtractor.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TranscriptExtractor.Tests/TranscriptExtractor.Tests.csproj" />
+  </Folder>
+</Solution>
