@@ -61,6 +61,27 @@ app.MapGet("/transcripts/{id:guid}", async (Guid id, TranscriptExtractorDbContex
     });
 });
 
+app.MapGet("/transcripts/{id:guid}/extraction", async (Guid id, TranscriptExtractorDbContext db) =>
+{
+    var document = await db.ExtractionDocuments
+        .OrderByDescending(x => x.CreatedAt)
+        .FirstOrDefaultAsync(x => x.TranscriptId == id);
+
+    if (document is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(new
+    {
+        transcriptId = document.TranscriptId,
+        extractionDocumentId = document.Id,
+        model = document.Model,
+        promptVersion = document.PromptVersion,
+        json = document.Json
+    });
+});
+
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
