@@ -86,7 +86,7 @@ public sealed class QuestTranscriptPdfRenderer(
                             });
                         });
 
-                        content.Item().PaddingTop(14);
+                        content.Item().PageBreak();
                         RenderLocationPanel(content, locationItems, verifiedMapLocations, mapImage);
                     });
             });
@@ -153,30 +153,42 @@ public sealed class QuestTranscriptPdfRenderer(
             section.Item().Text("Section 06").FontSize(9).FontColor("#8f7358");
             section.Item().Text("Key Locations").FontSize(18).Bold().FontFamily("Times New Roman");
 
-            if (mapImage is not null)
-            {
-                section.Item()
-                    .PaddingTop(10)
-                    .Background("#f8f1e4")
-                    .Border(1)
-                    .BorderColor("#e3d4be")
-                    .Padding(12)
-                    .Image(mapImage)
-                    .FitWidth();
-            }
-            else
-            {
-                section.Item()
-                    .PaddingTop(10)
-                    .Background("#f8f1e4")
-                    .Border(1)
-                    .BorderColor("#e3d4be")
-                    .MinHeight(260)
-                    .AlignMiddle()
-                    .AlignCenter()
-                    .Text("No verified map locations available.")
-                    .FontColor(Colors.Grey.Darken2);
-            }
+            section.Item()
+                .PaddingTop(10)
+                .Padding(12)
+                .Column(body =>
+                {
+                    if (verifiedMapLocations.Count > 0)
+                    {
+                        body.Item().Column(legend =>
+                        {
+                            legend.Item().Text("Legend").FontSize(10).FontColor("#8f7358");
+                            foreach (var location in verifiedMapLocations)
+                            {
+                                legend.Item().PaddingTop(4).Text($"{location.MarkerNumber}. {location.Address}").FontSize(10);
+                            }
+                        });
+                    }
+
+                    if (mapImage is not null)
+                    {
+                        body.Item()
+                            .PaddingTop(8)
+                            .MinHeight(340)
+                            .Image(mapImage)
+                            .FitWidth();
+                    }
+                    else
+                    {
+                        body.Item()
+                            .PaddingTop(8)
+                            .MinHeight(260)
+                            .AlignMiddle()
+                            .AlignCenter()
+                            .Text("No verified map locations available.")
+                            .FontColor(Colors.Grey.Darken2);
+                    }
+                });
         });
     }
 

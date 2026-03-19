@@ -36,9 +36,11 @@ public static class TranscriptReportHtmlRenderer
               .relationship-edge { position:absolute; padding:8px 12px; border-radius:999px; background:#f7eee0; border:1px solid #dfc6ab; color:#b24c20; font-size:13px; }
               .location-map-panel { display:block; }
               .map-canvas { height:420px; border-radius:14px; position:relative; overflow:hidden; background:radial-gradient(circle at 30% 34%, rgba(255,255,255,.55), transparent 16%), linear-gradient(180deg,#efe4d2 0%,#eadbc4 100%); border:1px solid #e3d4be; }
+              .map-legend { background:#fff8ec; border:1px solid #ead7bd; border-radius:12px; padding:10px 12px; color:#5b4738; font-size:12px; box-shadow:0 8px 18px rgba(66,44,23,.08); margin-bottom:12px; }
+              .map-legend-item { margin-bottom:6px; }
+              .map-legend-item:last-child { margin-bottom:0; }
               .map-road { position:absolute; background:#d6c1a5; border-radius:999px; opacity:.8; }
-              .map-marker { position:absolute; width:16px; height:16px; border-radius:50%; border:3px solid #fff7eb; box-shadow:0 0 0 1px rgba(70,45,22,.18); }
-              .map-label { position:absolute; background:#fff8ec; border:1px solid #ead7bd; border-radius:12px; padding:8px 10px; color:#5b4738; font-size:12px; box-shadow:0 8px 18px rgba(66,44,23,.08); }
+              .map-marker { position:absolute; width:28px; height:28px; border-radius:50%; border:3px solid #fff7eb; box-shadow:0 0 0 1px rgba(70,45,22,.18); color:#fffdf9; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
               .map-unavailable { height:100%; display:flex; align-items:center; justify-content:center; text-align:center; color:#6f5a48; font-size:15px; padding:18px; }
               .location-data-store { display:none; }
               ul.clean-list { list-style:none; padding:0; margin:0; }
@@ -124,6 +126,13 @@ public static class TranscriptReportHtmlRenderer
         }
         else
         {
+            html.AppendLine("<div class='map-legend'>");
+            foreach (var location in report.VerifiedMapLocations)
+            {
+                html.AppendLine($"<div class='map-legend-item'><strong>{location.MarkerNumber}.</strong> {WebUtility.HtmlEncode(location.Address)}</div>");
+            }
+            html.AppendLine("</div>");
+            html.AppendLine("<div class='map-canvas'>");
             html.AppendLine("<div class='map-road' style='left:24px;top:74px;width:420px;height:10px;transform:rotate(2deg);'></div>");
             html.AppendLine("<div class='map-road' style='left:64px;top:222px;width:360px;height:10px;transform:rotate(-8deg);'></div>");
             html.AppendLine("<div class='map-road' style='left:246px;top:22px;width:10px;height:240px;'></div>");
@@ -162,12 +171,14 @@ public static class TranscriptReportHtmlRenderer
                     _ => "242px"
                 };
 
-                html.AppendLine($"<div class='map-marker' style='left:{left};top:{top};background:{markerColor};'></div>");
-                html.AppendLine($"<div class='map-label' style='left:{labelLeft};top:{labelTop};'>{WebUtility.HtmlEncode(location.Address)}</div>");
+                html.AppendLine($"<div class='map-marker' style='left:{left};top:{top};background:{markerColor};'>{location.MarkerNumber}</div>");
             }
+            html.AppendLine("</div>");
         }
-
-        html.AppendLine("</div>");
+        if (report.VerifiedMapLocations.Count == 0)
+        {
+            html.AppendLine("</div>");
+        }
         html.AppendLine("<div class='location-data-store'>");
         foreach (var location in report.Locations.Select((value, index) => new { value, index }))
         {

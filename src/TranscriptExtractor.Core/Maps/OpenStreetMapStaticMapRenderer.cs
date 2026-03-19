@@ -27,7 +27,7 @@ public sealed class OpenStreetMapStaticMapRenderer(HttpClient httpClient) : ISta
 
     private async Task<Image<Rgba32>> BuildMapAsync(StaticMapRequest request, CancellationToken cancellationToken)
     {
-        var zoom = 14;
+        var zoom = CalculateZoom(request);
         var centerLat = request.Pins.Average(x => x.Latitude);
         var centerLon = request.Pins.Average(x => x.Longitude);
 
@@ -63,8 +63,7 @@ public sealed class OpenStreetMapStaticMapRenderer(HttpClient httpClient) : ISta
             var pinWorld = ToWorldPixel(pin.Latitude, pin.Longitude, zoom);
             var pinX = (int)Math.Round(pinWorld.X - topLeftWorldX);
             var pinY = (int)Math.Round(pinWorld.Y - topLeftWorldY);
-            DrawPin(canvas, pinX, pinY);
-            DrawAddressLabel(canvas, pinX, pinY, pin.Address);
+            DrawPin(canvas, pinX, pinY, pin.MarkerNumber);
         }
 
         return canvas;
@@ -97,9 +96,41 @@ public sealed class OpenStreetMapStaticMapRenderer(HttpClient httpClient) : ISta
         return (x, y);
     }
 
-    private static void DrawPin(Image<Rgba32> image, int centerX, int centerY)
+    private static int CalculateZoom(StaticMapRequest request)
     {
-        const int radius = 8;
+        if (request.Pins.Count <= 1)
+        {
+            return 15;
+        }
+
+        const int minZoom = 10;
+        const int maxZoom = 16;
+        const double paddingFactor = 0.82d;
+
+        var minLat = request.Pins.Min(x => x.Latitude);
+        var maxLat = request.Pins.Max(x => x.Latitude);
+        var minLon = request.Pins.Min(x => x.Longitude);
+        var maxLon = request.Pins.Max(x => x.Longitude);
+
+        for (var zoom = maxZoom; zoom >= minZoom; zoom--)
+        {
+            var minPixel = ToWorldPixel(maxLat, minLon, zoom);
+            var maxPixel = ToWorldPixel(minLat, maxLon, zoom);
+            var width = Math.Abs(maxPixel.X - minPixel.X);
+            var height = Math.Abs(maxPixel.Y - minPixel.Y);
+
+            if (width <= request.Width * paddingFactor && height <= request.Height * paddingFactor)
+            {
+                return zoom;
+            }
+        }
+
+        return minZoom;
+    }
+
+    private static void DrawPin(Image<Rgba32> image, int centerX, int centerY, int markerNumber)
+    {
+        const int radius = 14;
         var outer = new Rgba32(255, 255, 255, 255);
         var inner = new Rgba32(191, 96, 47, 255);
 
@@ -127,36 +158,15 @@ public sealed class OpenStreetMapStaticMapRenderer(HttpClient httpClient) : ISta
                 }
             }
         }
-    }
-
-    private static void DrawAddressLabel(Image<Rgba32> image, int pinX, int pinY, string address)
-    {
-        if (string.IsNullOrWhiteSpace(address))
-        {
-            return;
-        }
-
-        var font = SystemFonts.CreateFont("Arial", 16, FontStyle.Bold);
-        var paddingX = 12;
-        var paddingY = 8;
-        var position = new PointF(
-            Math.Clamp(pinX + 18, 8, Math.Max(8, image.Width - 240)),
-            Math.Clamp(pinY - 34, 8, Math.Max(8, image.Height - 40)));
-
-        var textSize = TextMeasurer.MeasureSize(address, new TextOptions(font));
-        var boxWidth = MathF.Min(textSize.Width + (paddingX * 2), image.Width - position.X - 8);
-        var boxHeight = textSize.Height + (paddingY * 2);
-        var rectangle = new RectangularPolygon(position.X, position.Y, boxWidth, boxHeight);
 
         image.Mutate(ctx =>
         {
-            ctx.Fill(new Rgba32(255, 248, 236, 235), rectangle);
-            ctx.Draw(Pens.Solid(new Rgba32(234, 215, 189, 255), 1), rectangle);
             ctx.DrawText(
-                address,
-                font,
-                new Rgba32(91, 71, 56, 255),
-                new PointF(position.X + paddingX, position.Y + paddingY));
+                markerNumber.ToString(),
+                SystemFonts.CreateFont("Arial", 14, FontStyle.Bold),
+                new Rgba32(255, 253, 249, 255),
+                new PointF(centerX - 5, centerY - 9));
         });
     }
+
 }
