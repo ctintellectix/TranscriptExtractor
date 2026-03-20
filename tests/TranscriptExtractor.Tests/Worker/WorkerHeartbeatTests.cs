@@ -86,6 +86,70 @@ public class WorkerHeartbeatTests
         Assert.Equal("boom", heartbeat.LastError);
     }
 
+    [Fact]
+    public async Task DatabaseConnectivityFailure_DoesNotCrashWorkerCycle()
+    {
+        var workerName = "worker-heartbeat-connectivity-failure";
+        using var host = CreateHost(workerName, transcriptText: null, extractionClientFactory: _ => new IdleTranscriptExtractionClient());
+        var worker = new TestWorker(
+            NullLogger<WorkerService>.Instance,
+            host.GetRequiredService<IServiceScopeFactory>(),
+            new WorkerIdentity(workerName),
+            loadHeartbeatShouldFail: attempt => attempt == 1);
+
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(new[] { TimeSpan.FromMilliseconds(250) }, worker.RecordedDelays);
+    }
+
+    [Fact]
+    public async Task RepeatedDatabaseConnectivityFailures_IncreaseRetryDelay()
+    {
+        var workerName = "worker-heartbeat-connectivity-backoff";
+        using var host = CreateHost(workerName, transcriptText: null, extractionClientFactory: _ => new IdleTranscriptExtractionClient());
+        var worker = new TestWorker(
+            NullLogger<WorkerService>.Instance,
+            host.GetRequiredService<IServiceScopeFactory>(),
+            new WorkerIdentity(workerName),
+            loadHeartbeatShouldFail: _ => true);
+
+        await worker.RunOnceAsync(CancellationToken.None);
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(
+            new[]
+            {
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(500)
+            },
+            worker.RecordedDelays);
+    }
+
+    [Fact]
+    public async Task SuccessfulCycle_ResetsRetryDelayAfterConnectivityRecovery()
+    {
+        var workerName = "worker-heartbeat-connectivity-reset";
+        using var host = CreateHost(workerName, transcriptText: null, extractionClientFactory: _ => new IdleTranscriptExtractionClient());
+        var worker = new TestWorker(
+            NullLogger<WorkerService>.Instance,
+            host.GetRequiredService<IServiceScopeFactory>(),
+            new WorkerIdentity(workerName),
+            loadHeartbeatShouldFail: attempt => attempt == 1 || attempt == 3);
+
+        await worker.RunOnceAsync(CancellationToken.None);
+        await worker.RunOnceAsync(CancellationToken.None);
+        await worker.RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(
+            new[]
+            {
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromMilliseconds(250)
+            },
+            worker.RecordedDelays);
+    }
+
     private static TestWorker CreateWorker(IServiceProvider serviceProvider, string workerName)
     {
         return new TestWorker(
@@ -137,9 +201,34 @@ public class WorkerHeartbeatTests
     private sealed class TestWorker(
         ILogger<WorkerService> logger,
         IServiceScopeFactory scopeFactory,
-        WorkerIdentity identity) : WorkerService(logger, scopeFactory, identity)
+        WorkerIdentity identity,
+        Func<int, bool>? loadHeartbeatShouldFail = null) : WorkerService(logger, scopeFactory, identity)
     {
-        public Task RunOnceAsync(CancellationToken cancellationToken) => ExecuteCycleAsync(cancellationToken);
+        private readonly Func<int, bool> _loadHeartbeatShouldFail = loadHeartbeatShouldFail ?? (_ => false);
+        private readonly string _workerName = identity.WorkerName;
+        private int _loadHeartbeatAttempts;
+
+        public List<TimeSpan> RecordedDelays { get; } = [];
+
+        public Task RunOnceAsync(CancellationToken cancellationToken) => ExecuteCycleWithRetryAsync(cancellationToken);
+
+        protected override Task<WorkerHeartbeat?> LoadHeartbeatAsync(TranscriptExtractorDbContext db, CancellationToken cancellationToken)
+        {
+            _loadHeartbeatAttempts++;
+
+            if (_loadHeartbeatShouldFail(_loadHeartbeatAttempts))
+            {
+                throw new TimeoutException("Database unavailable.");
+            }
+
+            return db.WorkerHeartbeats.SingleOrDefaultAsync(x => x.WorkerName == _workerName, cancellationToken);
+        }
+
+        protected override Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            RecordedDelays.Add(delay);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakePromptAssetLoader(PromptAssets assets) : IPromptAssetLoader
