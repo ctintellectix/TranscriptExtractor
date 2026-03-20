@@ -16,13 +16,15 @@ public class WorkerLifetimeTests
             promptAssetLoader: null!,
             extractionClient: null!,
             promptDirectory: "unused"));
+        services.AddSingleton(new TranscriptExtractor.Worker.WorkerIdentity("worker-a"));
 
         using var provider = services.BuildServiceProvider(validateScopes: true);
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
 
         var worker = new WorkerService(
             NullLogger<WorkerService>.Instance,
-            scopeFactory);
+            scopeFactory,
+            provider.GetRequiredService<TranscriptExtractor.Worker.WorkerIdentity>());
 
         Assert.NotNull(worker);
     }

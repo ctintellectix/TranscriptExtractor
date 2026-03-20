@@ -29,6 +29,8 @@ builder.Services.AddHttpClient<ITranscriptExtractionClient, OpenAiTranscriptExtr
         httpClient.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
     }
 });
+builder.Services.AddSingleton(new WorkerIdentity(
+    builder.Environment.ApplicationName ?? "TranscriptExtractor.Worker"));
 builder.Services.AddScoped(sp => new TranscriptExtractionOrchestrator(
     sp.GetRequiredService<TranscriptExtractorDbContext>(),
     sp.GetRequiredService<IPromptAssetLoader>(),

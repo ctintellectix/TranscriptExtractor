@@ -10,7 +10,7 @@ public sealed class TranscriptExtractionOrchestrator(
     ITranscriptExtractionClient extractionClient,
     string promptDirectory)
 {
-    public async Task<bool> ProcessOneAsync(CancellationToken cancellationToken)
+    public async Task<TranscriptExtractionProcessResult> ProcessOneWithResultAsync(CancellationToken cancellationToken)
     {
         var job = await db.ExtractionJobs
             .OrderBy(x => x.CreatedAt)
@@ -18,7 +18,7 @@ public sealed class TranscriptExtractionOrchestrator(
 
         if (job is null)
         {
-            return false;
+            return TranscriptExtractionProcessResult.Idle;
         }
 
         job.MarkProcessing();
@@ -31,7 +31,7 @@ public sealed class TranscriptExtractionOrchestrator(
             {
                 job.MarkFailed("Transcript not found.");
                 await db.SaveChangesAsync(cancellationToken);
-                return true;
+                return TranscriptExtractionProcessResult.Failure("Transcript not found.");
             }
 
             var assets = promptAssetLoader.Load(promptDirectory);
@@ -47,13 +47,28 @@ public sealed class TranscriptExtractionOrchestrator(
             db.ExtractionDocuments.Add(document);
             job.MarkCompleted(result.Model, assets.Version);
             await db.SaveChangesAsync(cancellationToken);
-            return true;
+            return TranscriptExtractionProcessResult.Success();
         }
         catch (Exception ex)
         {
             job.MarkFailed(ex.Message);
             await db.SaveChangesAsync(cancellationToken);
-            return true;
+            return TranscriptExtractionProcessResult.Failure(ex.Message);
         }
     }
+
+    public async Task<bool> ProcessOneAsync(CancellationToken cancellationToken)
+    {
+        var result = await ProcessOneWithResultAsync(cancellationToken);
+        return result.Processed;
+    }
+}
+
+public sealed record TranscriptExtractionProcessResult(bool Processed, bool Succeeded, string? ErrorMessage)
+{
+    public static TranscriptExtractionProcessResult Idle { get; } = new(false, false, null);
+
+    public static TranscriptExtractionProcessResult Success() => new(true, true, null);
+
+    public static TranscriptExtractionProcessResult Failure(string errorMessage) => new(true, false, errorMessage);
 }
