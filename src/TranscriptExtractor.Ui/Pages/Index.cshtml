@@ -4,7 +4,148 @@
     ViewData["Title"] = "Operator Dashboard";
 }
 
-<section>
-    <h1>Transcript Extractor</h1>
-    <p>Operator dashboard scaffold is ready.</p>
+<section class="dashboard-shell">
+    <header class="dashboard-hero">
+        <div class="dashboard-hero-copy">
+            <p class="eyebrow">Operator dashboard</p>
+            <h1>Transcript Extractor</h1>
+            <p class="lead">Live extraction queue, worker health, and the newest transcript activity in one place.</p>
+        </div>
+
+        <div class="dashboard-hero-status">
+            <span class="status-pill status-@Model.WorkerHealth.Status">@((Model.WorkerHealth.Status ?? "unknown").ToUpperInvariant())</span>
+            <div>
+                <div class="status-label">Worker</div>
+                <strong>@(Model.WorkerHealth.WorkerName ?? "No worker heartbeat")</strong>
+            </div>
+            <div class="status-metadata">
+                <span>Last poll: @FormatTimestamp(Model.WorkerHealth.LastPollAt)</span>
+                @if (Model.WorkerHealth.LastError is not null)
+                {
+                    <span class="danger-text">@Model.WorkerHealth.LastError</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.LoadErrorMessage))
+    {
+        <div class="load-warning">@Model.LoadErrorMessage</div>
+    }
+
+    <section class="metric-grid" aria-label="Dashboard summary">
+        <article class="metric-card metric-card-accent">
+            <span class="metric-label">Queued</span>
+            <strong>@Model.Summary.QueuedCount</strong>
+            <span class="metric-footnote">Waiting for processing</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">Processing</span>
+            <strong>@Model.Summary.ProcessingCount</strong>
+            <span class="metric-footnote">Active extraction jobs</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">Completed</span>
+            <strong>@Model.Summary.CompletedCount</strong>
+            <span class="metric-footnote">Successful runs</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-label">Failed</span>
+            <strong>@Model.Summary.FailedCount</strong>
+            <span class="metric-footnote">Needs attention</span>
+        </article>
+    </section>
+
+    <section class="dashboard-panels">
+        <article class="panel">
+            <div class="panel-header">
+                <div>
+                    <p class="panel-label">Latest activity</p>
+                    <h2>Newest jobs</h2>
+                </div>
+                <span class="panel-meta">Updated @FormatTimestamp(Model.Summary.LatestJobUpdatedAt)</span>
+            </div>
+
+            @if (Model.RecentTranscripts.Count == 0)
+            {
+                <p class="empty-state">No recent transcripts are available yet.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transcript</th>
+                                <th>Status</th>
+                                <th>Activity</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.RecentTranscripts)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="table-primary">@(!string.IsNullOrWhiteSpace(item.CaseNumber) ? item.CaseNumber : item.Interviewer ?? "Untitled transcript")</div>
+                                        <div class="table-secondary">@(item.Interviewer ?? "Unknown interviewer") · @(item.SourceType ?? "Unknown source")</div>
+                                    </td>
+                                    <td>
+                                        <span class="status-pill status-@item.JobStatus">@((item.JobStatus ?? "unknown").ToUpperInvariant())</span>
+                                    </td>
+                                    <td>@FormatTimestamp(item.ActivityAt)</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(item.FailureMessage))
+                                        {
+                                            <span class="danger-text">@item.FailureMessage</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="table-secondary">No failure message</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </article>
+
+        <aside class="panel panel-stack">
+            <div class="panel">
+                <p class="panel-label">Freshness</p>
+                <h2>Recent timestamps</h2>
+                <dl class="timestamp-list">
+                    <div>
+                        <dt>Transcript received</dt>
+                        <dd>@FormatTimestamp(Model.Summary.LatestTranscriptReceivedAt)</dd>
+                    </div>
+                    <div>
+                        <dt>Job created</dt>
+                        <dd>@FormatTimestamp(Model.Summary.LatestJobCreatedAt)</dd>
+                    </div>
+                    <div>
+                        <dt>Job updated</dt>
+                        <dd>@FormatTimestamp(Model.Summary.LatestJobUpdatedAt)</dd>
+                    </div>
+                    <div>
+                        <dt>Latest success</dt>
+                        <dd>@FormatTimestamp(Model.Summary.LatestCompletedAt)</dd>
+                    </div>
+                    <div>
+                        <dt>Latest failure</dt>
+                        <dd>@FormatTimestamp(Model.Summary.LatestFailedAt)</dd>
+                    </div>
+                </dl>
+            </div>
+        </aside>
+    </section>
 </section>
+
+@functions {
+    private static string FormatTimestamp(DateTimeOffset? value)
+    {
+        return value.HasValue ? value.Value.LocalDateTime.ToString("MMM d, h:mm tt") : "—";
+    }
+}

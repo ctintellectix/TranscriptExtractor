@@ -3,7 +3,7 @@ using TranscriptExtractor.Ui.Api;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
-builder.Services.AddHttpClient<TranscriptExtractorApiClient>((sp, httpClient) =>
+builder.Services.AddHttpClient<IDashboardApiClient, TranscriptExtractorApiClient>((sp, httpClient) =>
 {
     var configuration = sp.GetRequiredService<IConfiguration>();
     var apiBaseUrl = configuration["ApiBaseUrl"]

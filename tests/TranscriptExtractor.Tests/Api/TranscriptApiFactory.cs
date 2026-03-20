@@ -1,3 +1,5 @@
+extern alias ApiApp;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -8,7 +10,7 @@ using TranscriptExtractor.Core;
 
 namespace TranscriptExtractor.Tests.Api;
 
-public sealed class TranscriptApiFactory : WebApplicationFactory<Program>
+public sealed class TranscriptApiFactory : WebApplicationFactory<ApiApp::Program>
 {
     private readonly string _databaseName = $"TranscriptExtractorTests-{Guid.NewGuid():N}";
 
