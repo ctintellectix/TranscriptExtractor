@@ -98,9 +98,15 @@ app.MapGet("/dashboard/summary", async (TranscriptExtractorDbContext db) =>
 app.MapGet("/dashboard/recent", async (TranscriptExtractorDbContext db) =>
 {
     var recent = await (
-        from job in db.ExtractionJobs
-        join transcript in db.Transcripts on job.TranscriptId equals transcript.Id
-        orderby job.UpdatedAt descending, job.CreatedAt descending
+        from transcript in db.Transcripts
+        let job = db.ExtractionJobs
+            .Where(x => x.TranscriptId == transcript.Id)
+            .OrderByDescending(x => x.UpdatedAt)
+            .ThenByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefault()
+        where job != null
+        orderby job.UpdatedAt descending, job.CreatedAt descending, transcript.Id descending
         select new RecentTranscriptResponse
         {
             TranscriptId = transcript.Id,
@@ -243,11 +249,12 @@ public partial class Program
             return "stale";
         }
 
-        if (heartbeat.LastSuccessfulJobAt is null)
+        if (heartbeat.LastErrorAt is not null &&
+            (heartbeat.LastSuccessfulJobAt is null || heartbeat.LastErrorAt >= heartbeat.LastSuccessfulJobAt))
         {
             return "idle";
         }
 
-        return "healthy";
+        return heartbeat.LastSuccessfulJobAt is not null ? "healthy" : "idle";
     }
 }

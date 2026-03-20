@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TranscriptExtractor.Core;
@@ -11,7 +10,7 @@ namespace TranscriptExtractor.Tests.Api;
 
 public sealed class TranscriptApiFactory : WebApplicationFactory<Program>
 {
-    private readonly InMemoryDatabaseRoot _databaseRoot = new();
+    private readonly string _databaseName = $"TranscriptExtractorTests-{Guid.NewGuid():N}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -35,7 +34,7 @@ public sealed class TranscriptApiFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<TranscriptExtractorDbContext>(options =>
-                options.UseInMemoryDatabase("TranscriptExtractorTests", _databaseRoot));
+                options.UseInMemoryDatabase(_databaseName));
         });
     }
 

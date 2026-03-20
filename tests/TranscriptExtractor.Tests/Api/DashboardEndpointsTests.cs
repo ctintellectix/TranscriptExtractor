@@ -53,10 +53,12 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         await _factory.ResetDatabaseAsync();
 
         var now = DateTimeOffset.UtcNow;
-        var older = await SeedTranscriptJobAsync("older", ExtractionJobStatus.Queued, now.AddMinutes(-40), now.AddMinutes(-35), now.AddMinutes(-35));
-        var middle = await SeedTranscriptJobAsync("middle", ExtractionJobStatus.Processing, now.AddMinutes(-25), now.AddMinutes(-20), now.AddMinutes(-12));
-        var newest = await SeedTranscriptJobAsync("newest", ExtractionJobStatus.Completed, now.AddMinutes(-15), now.AddMinutes(-5), now.AddMinutes(-3), now.AddMinutes(-3));
-        var failed = await SeedTranscriptJobAsync("failed", ExtractionJobStatus.Failed, now.AddMinutes(-14), now.AddMinutes(-4), now.AddMinutes(-1), now.AddMinutes(-1), error: "Extraction failed.");
+        var sharedTranscript = await SeedTranscriptAsync("shared", Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"));
+        await SeedJobAsync(sharedTranscript, "shared-queued", ExtractionJobStatus.Queued, now.AddMinutes(-40), now.AddMinutes(-35), now.AddMinutes(-35));
+        var sharedLatestJob = await SeedJobAsync(sharedTranscript, "shared-failed", ExtractionJobStatus.Failed, now.AddMinutes(-14), now.AddMinutes(-4), now.AddMinutes(-1), now.AddMinutes(-1), error: "Extraction failed.");
+
+        var otherTranscript = await SeedTranscriptAsync("other", Guid.Parse("00000000-0000-0000-0000-000000000001"));
+        var otherLatestJob = await SeedJobAsync(otherTranscript, "other-completed", ExtractionJobStatus.Completed, now.AddMinutes(-14), now.AddMinutes(-4), now.AddMinutes(-1), completedAt: now.AddMinutes(-1));
 
         var response = await _client.GetAsync("/dashboard/recent");
 
@@ -65,18 +67,39 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var items = payload.RootElement.EnumerateArray().ToArray();
 
-        Assert.Equal(4, items.Length);
-        Assert.Equal(failed.TranscriptId, items[0].GetProperty("transcriptId").GetGuid());
-        Assert.Equal(newest.TranscriptId, items[1].GetProperty("transcriptId").GetGuid());
-        Assert.Equal(middle.TranscriptId, items[2].GetProperty("transcriptId").GetGuid());
-        Assert.Equal(older.TranscriptId, items[3].GetProperty("transcriptId").GetGuid());
+        Assert.Equal(2, items.Length);
+        Assert.Equal(sharedTranscript.Id, items[0].GetProperty("transcriptId").GetGuid());
+        Assert.Equal(otherTranscript.Id, items[1].GetProperty("transcriptId").GetGuid());
         Assert.Equal("Failed", items[0].GetProperty("jobStatus").GetString());
-        Assert.Equal("failed", items[0].GetProperty("interviewer").GetString());
+        Assert.Equal("shared", items[0].GetProperty("interviewer").GetString());
         Assert.Equal("Extraction failed.", items[0].GetProperty("failureMessage").GetString());
+        Assert.Equal(sharedLatestJob.Id, items[0].GetProperty("jobId").GetGuid());
         Assert.Equal("Completed", items[1].GetProperty("jobStatus").GetString());
+        Assert.Equal("other", items[1].GetProperty("interviewer").GetString());
         Assert.Null(items[1].GetProperty("failureMessage").GetString());
-        Assert.Equal("Processing", items[2].GetProperty("jobStatus").GetString());
-        Assert.Equal("Queued", items[3].GetProperty("jobStatus").GetString());
+        Assert.Equal(otherLatestJob.Id, items[1].GetProperty("jobId").GetGuid());
+    }
+
+    [Fact]
+    public async Task GetWorkerHealth_ReturnsIdleWhenNewerErrorFollowsSuccess()
+    {
+        await _factory.ResetDatabaseAsync();
+
+        var heartbeat = await SeedHeartbeatAsync("worker-d", DateTimeOffset.UtcNow.AddMinutes(-1));
+        await UpdateHeartbeatAsync(
+            heartbeat,
+            lastSuccessfulJobAt: DateTimeOffset.UtcNow.AddMinutes(-2),
+            lastErrorAt: DateTimeOffset.UtcNow.AddSeconds(-30),
+            lastError: "Extraction failed.");
+
+        var response = await _client.GetAsync("/worker/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("idle", payload.RootElement.GetProperty("status").GetString());
+        Assert.Equal("worker-d", payload.RootElement.GetProperty("workerName").GetString());
+        Assert.Equal("Extraction failed.", payload.RootElement.GetProperty("lastError").GetString());
     }
 
     [Fact]
@@ -150,22 +173,49 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         DateTimeOffset? completedAt = null,
         string? error = null)
     {
+        var transcript = await SeedTranscriptAsync(label);
+        var job = await SeedJobAsync(transcript, label, status, receivedAt, createdAt, updatedAt, completedAt, error);
+        return (transcript.Id, job.Id);
+    }
+
+    private async Task<Transcript> SeedTranscriptAsync(string label, Guid? transcriptId = null)
+    {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TranscriptExtractorDbContext>();
 
         var transcript = new Transcript
         {
+            Id = transcriptId ?? Guid.NewGuid(),
             TranscriptText = $"Transcript {label}",
             SourceType = "witness_interview",
             CaseNumber = $"CASE-{label.ToUpperInvariant()}",
             Interviewer = label
         };
-        var job = new ExtractionJob(transcript.Id);
 
         db.Transcripts.Add(transcript);
+        await db.SaveChangesAsync();
+        return transcript;
+    }
+
+    private async Task<ExtractionJob> SeedJobAsync(
+        Transcript transcript,
+        string label,
+        ExtractionJobStatus status,
+        DateTimeOffset receivedAt,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt,
+        DateTimeOffset? completedAt = null,
+        string? error = null)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TranscriptExtractorDbContext>();
+
+        var trackedTranscript = await db.Transcripts.SingleAsync(x => x.Id == transcript.Id);
+        db.Entry(trackedTranscript).Property(x => x.ReceivedAt).CurrentValue = receivedAt;
+
+        var job = new ExtractionJob(trackedTranscript.Id);
         db.ExtractionJobs.Add(job);
 
-        db.Entry(transcript).Property(x => x.ReceivedAt).CurrentValue = receivedAt;
         db.Entry(job).Property(x => x.CreatedAt).CurrentValue = createdAt;
         db.Entry(job).Property(x => x.UpdatedAt).CurrentValue = updatedAt;
         db.Entry(job).Property(x => x.Status).CurrentValue = status;
@@ -185,11 +235,11 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         if (status == ExtractionJobStatus.Failed)
         {
             db.Entry(job).Property(x => x.CompletedAt).CurrentValue = completedAt ?? updatedAt;
-            db.Entry(job).Property(x => x.Error).CurrentValue = error;
+            db.Entry(job).Property(x => x.Error).CurrentValue = error ?? $"Job {label} failed.";
         }
 
         await db.SaveChangesAsync();
-        return (transcript.Id, job.Id);
+        return job;
     }
 
     private async Task<WorkerHeartbeat> SeedHeartbeatAsync(string workerName, DateTimeOffset lastPollAt)
