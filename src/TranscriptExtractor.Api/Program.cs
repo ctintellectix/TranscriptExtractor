@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TranscriptExtractor.Api.Startup;
 using TranscriptExtractor.Api.Contracts;
 using TranscriptExtractor.Core;
 using TranscriptExtractor.Core.Entities;
@@ -21,11 +22,17 @@ builder.Services.AddDbContext<TranscriptExtractorDbContext>(options =>
         builder.Configuration.GetConnectionString("TranscriptExtractor")
             ?? throw new InvalidOperationException("Connection string 'TranscriptExtractor' is required."));
 });
+builder.Services.AddScoped<IDatabaseMigrationRunner, DatabaseMigrationRunner>();
 builder.Services.AddHttpClient<IAddressGeocoder, OpenStreetMapAddressGeocoder>();
 builder.Services.AddHttpClient<IStaticMapRenderer, OpenStreetMapStaticMapRenderer>();
 builder.Services.AddScoped<ITranscriptPdfRenderer, QuestTranscriptPdfRenderer>();
 
 var app = builder.Build();
+
+await DatabaseMigration.ApplyAsync(
+    app.Environment,
+    app.Services.GetRequiredService<IDatabaseMigrationRunner>(),
+    CancellationToken.None);
 
 app.MapPost("/transcripts", async (CreateTranscriptRequest request, TranscriptExtractorDbContext db) =>
 {
