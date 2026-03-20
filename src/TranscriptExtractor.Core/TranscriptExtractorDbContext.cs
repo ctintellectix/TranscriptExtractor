@@ -8,6 +8,7 @@ public class TranscriptExtractorDbContext(DbContextOptions<TranscriptExtractorDb
     public DbSet<Transcript> Transcripts => Set<Transcript>();
     public DbSet<ExtractionJob> ExtractionJobs => Set<ExtractionJob>();
     public DbSet<ExtractionDocument> ExtractionDocuments => Set<ExtractionDocument>();
+    public DbSet<WorkerHeartbeat> WorkerHeartbeats => Set<WorkerHeartbeat>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +69,18 @@ public class TranscriptExtractorDbContext(DbContextOptions<TranscriptExtractorDb
 
         modelBuilder.Entity<ExtractionDocument>()
             .HasIndex(x => x.TranscriptId)
+            .IsUnique();
+
+        modelBuilder.Entity<WorkerHeartbeat>()
+            .Property(x => x.WorkerName)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<WorkerHeartbeat>()
+            .Property(x => x.LastError)
+            .HasColumnType("text");
+
+        modelBuilder.Entity<WorkerHeartbeat>()
+            .HasIndex(x => x.WorkerName)
             .IsUnique();
     }
 }
