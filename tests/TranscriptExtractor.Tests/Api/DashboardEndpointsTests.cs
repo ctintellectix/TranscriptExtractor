@@ -56,6 +56,7 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         var older = await SeedTranscriptJobAsync("older", ExtractionJobStatus.Queued, now.AddMinutes(-40), now.AddMinutes(-35), now.AddMinutes(-35));
         var middle = await SeedTranscriptJobAsync("middle", ExtractionJobStatus.Processing, now.AddMinutes(-25), now.AddMinutes(-20), now.AddMinutes(-12));
         var newest = await SeedTranscriptJobAsync("newest", ExtractionJobStatus.Completed, now.AddMinutes(-15), now.AddMinutes(-5), now.AddMinutes(-3), now.AddMinutes(-3));
+        var failed = await SeedTranscriptJobAsync("failed", ExtractionJobStatus.Failed, now.AddMinutes(-14), now.AddMinutes(-4), now.AddMinutes(-1), now.AddMinutes(-1), error: "Extraction failed.");
 
         var response = await _client.GetAsync("/dashboard/recent");
 
@@ -64,13 +65,18 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var items = payload.RootElement.EnumerateArray().ToArray();
 
-        Assert.Equal(3, items.Length);
-        Assert.Equal(newest.TranscriptId, items[0].GetProperty("transcriptId").GetGuid());
-        Assert.Equal(middle.TranscriptId, items[1].GetProperty("transcriptId").GetGuid());
-        Assert.Equal(older.TranscriptId, items[2].GetProperty("transcriptId").GetGuid());
-        Assert.Equal("Completed", items[0].GetProperty("jobStatus").GetString());
-        Assert.Equal("Processing", items[1].GetProperty("jobStatus").GetString());
-        Assert.Equal("Queued", items[2].GetProperty("jobStatus").GetString());
+        Assert.Equal(4, items.Length);
+        Assert.Equal(failed.TranscriptId, items[0].GetProperty("transcriptId").GetGuid());
+        Assert.Equal(newest.TranscriptId, items[1].GetProperty("transcriptId").GetGuid());
+        Assert.Equal(middle.TranscriptId, items[2].GetProperty("transcriptId").GetGuid());
+        Assert.Equal(older.TranscriptId, items[3].GetProperty("transcriptId").GetGuid());
+        Assert.Equal("Failed", items[0].GetProperty("jobStatus").GetString());
+        Assert.Equal("failed", items[0].GetProperty("interviewer").GetString());
+        Assert.Equal("Extraction failed.", items[0].GetProperty("failureMessage").GetString());
+        Assert.Equal("Completed", items[1].GetProperty("jobStatus").GetString());
+        Assert.Null(items[1].GetProperty("failureMessage").GetString());
+        Assert.Equal("Processing", items[2].GetProperty("jobStatus").GetString());
+        Assert.Equal("Queued", items[3].GetProperty("jobStatus").GetString());
     }
 
     [Fact]
@@ -151,7 +157,8 @@ public class DashboardEndpointsTests : IClassFixture<TranscriptApiFactory>
         {
             TranscriptText = $"Transcript {label}",
             SourceType = "witness_interview",
-            CaseNumber = $"CASE-{label.ToUpperInvariant()}"
+            CaseNumber = $"CASE-{label.ToUpperInvariant()}",
+            Interviewer = label
         };
         var job = new ExtractionJob(transcript.Id);
 
