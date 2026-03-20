@@ -75,6 +75,19 @@ public class IndexModelTests
         Assert.Null(model.WorkerHealth.WorkerName);
     }
 
+    [Fact]
+    public async Task OnGetAsync_WhenApiTimesOut_SetsLoadErrorMessage()
+    {
+        var model = new IndexModel(new TimingOutDashboardApiClient());
+
+        await model.OnGetAsync(CancellationToken.None);
+
+        Assert.Contains("dashboard", model.LoadErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(model.RecentTranscripts);
+        Assert.Equal(0, model.Summary.QueuedCount);
+        Assert.Null(model.WorkerHealth.WorkerName);
+    }
+
     private sealed class FakeDashboardApiClient(
         DashboardSummaryModel summary,
         IReadOnlyList<RecentTranscriptModel> recent,
@@ -94,5 +107,14 @@ public class IndexModelTests
         public Task<IReadOnlyList<RecentTranscriptModel>> GetRecentTranscriptsAsync(CancellationToken cancellationToken) => throw new HttpRequestException("API unavailable.");
 
         public Task<WorkerHealthModel> GetWorkerHealthAsync(CancellationToken cancellationToken) => throw new HttpRequestException("API unavailable.");
+    }
+
+    private sealed class TimingOutDashboardApiClient : IDashboardApiClient
+    {
+        public Task<DashboardSummaryModel> GetDashboardSummaryAsync(CancellationToken cancellationToken) => throw new TaskCanceledException("The request timed out.");
+
+        public Task<IReadOnlyList<RecentTranscriptModel>> GetRecentTranscriptsAsync(CancellationToken cancellationToken) => throw new TaskCanceledException("The request timed out.");
+
+        public Task<WorkerHealthModel> GetWorkerHealthAsync(CancellationToken cancellationToken) => throw new TaskCanceledException("The request timed out.");
     }
 }

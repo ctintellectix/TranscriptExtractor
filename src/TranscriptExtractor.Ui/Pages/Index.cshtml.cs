@@ -28,5 +28,9 @@ public class IndexModel(IDashboardApiClient dashboardApiClient) : PageModel
         {
             LoadErrorMessage = "Unable to load dashboard data right now. Check the API connection.";
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            LoadErrorMessage = "Unable to load dashboard data right now. Check the API connection.";
+        }
     }
 }
