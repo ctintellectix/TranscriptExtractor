@@ -38,4 +38,12 @@ public sealed class TranscriptApiFactory : WebApplicationFactory<Program>
                 options.UseInMemoryDatabase("TranscriptExtractorTests", _databaseRoot));
         });
     }
+
+    public async Task ResetDatabaseAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TranscriptExtractorDbContext>();
+        await db.Database.EnsureDeletedAsync();
+        await db.Database.EnsureCreatedAsync();
+    }
 }

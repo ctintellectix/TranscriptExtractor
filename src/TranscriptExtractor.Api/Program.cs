@@ -52,6 +52,102 @@ app.MapPost("/transcripts", async (CreateTranscriptRequest request, TranscriptEx
     });
 });
 
+app.MapGet("/dashboard/summary", async (TranscriptExtractorDbContext db) =>
+{
+    var queuedCount = await db.ExtractionJobs.CountAsync(x => x.Status == ExtractionJobStatus.Queued);
+    var processingCount = await db.ExtractionJobs.CountAsync(x => x.Status == ExtractionJobStatus.Processing);
+    var completedCount = await db.ExtractionJobs.CountAsync(x => x.Status == ExtractionJobStatus.Completed);
+    var failedCount = await db.ExtractionJobs.CountAsync(x => x.Status == ExtractionJobStatus.Failed);
+
+    var latestTranscriptReceivedAt = await db.Transcripts
+        .Select(x => (DateTimeOffset?)x.ReceivedAt)
+        .MaxAsync();
+
+    var latestJobCreatedAt = await db.ExtractionJobs
+        .Select(x => (DateTimeOffset?)x.CreatedAt)
+        .MaxAsync();
+
+    var latestJobUpdatedAt = await db.ExtractionJobs
+        .Select(x => (DateTimeOffset?)x.UpdatedAt)
+        .MaxAsync();
+
+    var latestCompletedAt = await db.ExtractionJobs
+        .Where(x => x.Status == ExtractionJobStatus.Completed)
+        .Select(x => x.CompletedAt)
+        .MaxAsync();
+
+    var latestFailedAt = await db.ExtractionJobs
+        .Where(x => x.Status == ExtractionJobStatus.Failed)
+        .Select(x => x.CompletedAt)
+        .MaxAsync();
+
+    return Results.Ok(new DashboardSummaryResponse
+    {
+        QueuedCount = queuedCount,
+        ProcessingCount = processingCount,
+        CompletedCount = completedCount,
+        FailedCount = failedCount,
+        LatestTranscriptReceivedAt = latestTranscriptReceivedAt,
+        LatestJobCreatedAt = latestJobCreatedAt,
+        LatestJobUpdatedAt = latestJobUpdatedAt,
+        LatestCompletedAt = latestCompletedAt,
+        LatestFailedAt = latestFailedAt
+    });
+});
+
+app.MapGet("/dashboard/recent", async (TranscriptExtractorDbContext db) =>
+{
+    var recent = await (
+        from job in db.ExtractionJobs
+        join transcript in db.Transcripts on job.TranscriptId equals transcript.Id
+        orderby job.UpdatedAt descending, job.CreatedAt descending
+        select new RecentTranscriptResponse
+        {
+            TranscriptId = transcript.Id,
+            JobId = job.Id,
+            CaseNumber = transcript.CaseNumber,
+            SourceType = transcript.SourceType,
+            JobStatus = job.Status.ToString(),
+            TranscriptReceivedAt = transcript.ReceivedAt,
+            JobCreatedAt = job.CreatedAt,
+            JobUpdatedAt = job.UpdatedAt,
+            JobStartedAt = job.StartedAt,
+            JobCompletedAt = job.CompletedAt,
+            ActivityAt = job.UpdatedAt
+        })
+        .Take(10)
+        .ToListAsync();
+
+    return Results.Ok(recent);
+});
+
+app.MapGet("/worker/health", async (TranscriptExtractorDbContext db) =>
+{
+    var heartbeat = await db.WorkerHeartbeats
+        .OrderByDescending(x => x.LastPollAt)
+        .FirstOrDefaultAsync();
+
+    if (heartbeat is null)
+    {
+        return Results.Ok(new WorkerHealthResponse
+        {
+            Status = "offline"
+        });
+    }
+
+    var status = GetWorkerHealthStatus(heartbeat, DateTimeOffset.UtcNow);
+
+    return Results.Ok(new WorkerHealthResponse
+    {
+        WorkerName = heartbeat.WorkerName,
+        Status = status,
+        LastPollAt = heartbeat.LastPollAt,
+        LastSuccessfulJobAt = heartbeat.LastSuccessfulJobAt,
+        LastErrorAt = heartbeat.LastErrorAt,
+        LastError = heartbeat.LastError
+    });
+});
+
 app.MapGet("/transcripts/{id:guid}", async (Guid id, TranscriptExtractorDbContext db) =>
 {
     var transcript = await db.Transcripts.FindAsync(id);
@@ -133,4 +229,23 @@ app.MapGet("/", () => "Hello World!");
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    private const int WorkerStaleThresholdMinutes = 15;
+
+    internal static string GetWorkerHealthStatus(WorkerHeartbeat heartbeat, DateTimeOffset now)
+    {
+        var staleThreshold = TimeSpan.FromMinutes(WorkerStaleThresholdMinutes);
+        if (now - heartbeat.LastPollAt > staleThreshold)
+        {
+            return "stale";
+        }
+
+        if (heartbeat.LastSuccessfulJobAt is null)
+        {
+            return "idle";
+        }
+
+        return "healthy";
+    }
+}
