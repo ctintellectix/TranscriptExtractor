@@ -1,0 +1,12 @@
+header,
+main {
+    margin: 1rem auto;
+    max-width: 72rem;
+    padding: 0 1rem;
+}
+
+nav a {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: none;
+}
