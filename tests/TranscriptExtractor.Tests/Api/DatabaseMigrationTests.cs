@@ -1,5 +1,6 @@
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using TranscriptExtractor.Api.Startup;
 
 namespace TranscriptExtractor.Tests.Api;
@@ -9,10 +10,13 @@ public class DatabaseMigrationTests
     [Fact]
     public async Task ApplyAsync_SkipsMigrationInTestingEnvironment()
     {
-        var runner = new RecordingMigrationRunner();
         var environment = new TestHostEnvironment("Testing");
+        var runner = new RecordingMigrationRunner();
+        var services = new ServiceCollection();
+        services.AddScoped<IDatabaseMigrationRunner>(_ => runner);
+        await using var provider = services.BuildServiceProvider().CreateAsyncScope();
 
-        await DatabaseMigration.ApplyAsync(environment, runner, CancellationToken.None);
+        await DatabaseMigration.ApplyAsync(environment, provider.ServiceProvider, CancellationToken.None);
 
         Assert.False(runner.WasCalled);
     }
@@ -20,10 +24,13 @@ public class DatabaseMigrationTests
     [Fact]
     public async Task ApplyAsync_InvokesMigrationOutsideTestingEnvironment()
     {
-        var runner = new RecordingMigrationRunner();
         var environment = new TestHostEnvironment("Development");
+        var runner = new RecordingMigrationRunner();
+        var services = new ServiceCollection();
+        services.AddScoped<IDatabaseMigrationRunner>(_ => runner);
+        await using var provider = services.BuildServiceProvider().CreateAsyncScope();
 
-        await DatabaseMigration.ApplyAsync(environment, runner, CancellationToken.None);
+        await DatabaseMigration.ApplyAsync(environment, provider.ServiceProvider, CancellationToken.None);
 
         Assert.True(runner.WasCalled);
     }

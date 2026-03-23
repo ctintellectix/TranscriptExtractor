@@ -20,13 +20,15 @@ public sealed class DatabaseMigrationRunner(IServiceProvider serviceProvider) : 
 
 public static class DatabaseMigration
 {
-    public static async Task ApplyAsync(IHostEnvironment environment, IDatabaseMigrationRunner migrationRunner, CancellationToken cancellationToken)
+    public static async Task ApplyAsync(IHostEnvironment environment, IServiceProvider serviceProvider, CancellationToken cancellationToken)
     {
         if (environment.IsEnvironment("Testing"))
         {
             return;
         }
 
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var migrationRunner = scope.ServiceProvider.GetRequiredService<IDatabaseMigrationRunner>();
         await migrationRunner.MigrateAsync(cancellationToken);
     }
 }

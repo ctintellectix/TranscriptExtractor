@@ -31,7 +31,7 @@ var app = builder.Build();
 
 await DatabaseMigration.ApplyAsync(
     app.Environment,
-    app.Services.GetRequiredService<IDatabaseMigrationRunner>(),
+    app.Services,
     CancellationToken.None);
 
 app.MapPost("/transcripts", async (CreateTranscriptRequest request, TranscriptExtractorDbContext db) =>
