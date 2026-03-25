@@ -4,5 +4,9 @@ obj/
 .codex-build/
 .vs/
 TestResults/
+.dotnet/
+.nuget/
+docs/superpowers/
+*.log
 *.user
 *.suo
